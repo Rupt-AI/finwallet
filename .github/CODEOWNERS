@@ -1,0 +1,13 @@
+# Global ownership
+* @tech-lead
+
+# Services ownership
+/services/auth/ @backend-team @security-lead
+/services/wallet/ @backend-team
+/services/transaction/ @backend-team
+
+# Infrastructure
+/infrastructure/ @platform-team @devops-team
+
+# Docs
+/docs/ @tech-lead @platform-team

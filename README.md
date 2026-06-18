@@ -11,3 +11,10 @@ Architecture:
 - DevSecOps First
 - Multi Cloud
 - Kubernetes Ready
+
+## Stack
+
+- Node.js 24
+- PNPM 11.7.0
+- Turborepo
+- Docker
