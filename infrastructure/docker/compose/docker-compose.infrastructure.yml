@@ -1,0 +1,202 @@
+version: "3.9"
+
+services:
+
+  # =========================
+  # POSTGRESQL (STABLE FIX)
+  # =========================
+  postgres:
+    image: postgres:17
+    stop_grace_period: 60s
+    container_name: finwallet-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: finwallet
+      POSTGRES_USER: finwallet_admin
+      POSTGRES_PASSWORD: FinWalletPostgres2026!
+
+    ports:
+      - "5432:5432"
+
+    networks:
+      - finwallet-platform-network
+
+    volumes:
+      - finwallet-postgres-data:/var/lib/postgresql/data
+      - ../postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+
+      test:
+        [
+         "CMD-SHELL",
+         "PGPASSWORD=${FINWALLET_POSTGRES_PASSWORD} psql -U ${FINWALLET_POSTGRES_USER} -d ${FINWALLET_POSTGRES_DB} -c 'SELECT 1;'"
+        ]
+
+      interval: 15s
+
+      timeout: 5s
+
+      retries: 10
+
+      start_period: 45s
+
+
+  # =========================
+  # REDIS
+  # =========================
+  redis:
+    image: redis:7.4-alpine
+    stop_grace_period: 30s
+    container_name: finwallet-redis
+    restart: unless-stopped
+
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+      - --requirepass
+      - ${FINWALLET_REDIS_PASSWORD}
+
+    ports:
+      - "6379:6379"
+
+    networks:
+      - finwallet-platform-network
+
+    volumes:
+      - finwallet-redis-data:/data
+      - ../redis/redis.conf:/usr/local/etc/redis/redis.conf
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+
+  # =========================
+  # KAFKA (KRaft)
+  # =========================
+  kafka:
+    image: apache/kafka:3.7.0
+    stop_grace_period: 90s
+    container_name: finwallet-kafka
+    restart: unless-stopped
+
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@finwallet-kafka:9093"
+
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://finwallet-kafka:9092
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: "8ILvAcBsQdeMIAiL9a_DaA"
+
+    volumes:
+      - finwallet-kafka-data:/var/lib/kafka/data
+
+    networks:
+      - finwallet-platform-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/9092'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+
+  # =========================
+  # KAFKA UI
+  # =========================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: finwallet-kafka-ui
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      KAFKA_CLUSTERS_0_NAME: finwallet
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: finwallet-kafka:9092
+
+    networks:
+      - finwallet-platform-network
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+
+  # =========================
+  # KONG API GATEWAY (FIXED PROPERLY)
+  # =========================
+  kong:
+    image: kong:3.6
+    container_name: finwallet-kong
+    restart: unless-stopped
+
+    environment:
+      KONG_DATABASE: postgres
+
+      KONG_PG_HOST: finwallet-postgres
+      KONG_PG_DATABASE: finwallet
+      KONG_PG_USER: finwallet_admin
+      KONG_PG_PASSWORD: FinWalletPostgres2026!
+
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+
+      KONG_LOG_LEVEL: info
+
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+
+    networks:
+      - finwallet-platform-network
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      
+      redis:
+        condition: service_healthy
+
+      kafka:
+        condition: service_healthy
+
+
+# =========================
+# NETWORK
+# =========================
+networks:
+  finwallet-platform-network:
+    external: true
+    name: finwallet-platform-network
+
+
+# =========================
+# VOLUMES
+# =========================
+volumes:
+  finwallet-postgres-data:
+    name: finwallet-postgres-data
+
+  finwallet-redis-data:
+    name: finwallet-redis-data
+
+  finwallet-kafka-data:
+    name: finwallet-kafka-data

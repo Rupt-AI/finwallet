@@ -1,0 +1,21 @@
+_format_version: "3.0"
+
+services:
+
+  - name: finwallet-kafka-ui-service
+    url: http://finwallet-kafka-ui:8080
+
+    routes:
+      - name: kafka-ui-route
+        paths:
+          - /kafka-ui
+        strip_path: true
+
+  - name: finwallet-health-service
+    url: http://httpbin.org
+
+    routes:
+      - name: test-route
+        paths:
+          - /test
+        strip_path: true

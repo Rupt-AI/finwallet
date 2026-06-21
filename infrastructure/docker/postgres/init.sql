@@ -1,0 +1,1 @@
+SELECT 'FinWallet PostgreSQL Initialized' AS status;
